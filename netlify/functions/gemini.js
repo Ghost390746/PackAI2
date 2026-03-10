@@ -1,66 +1,43 @@
 // netlify/functions/gemini.js
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;  // Set in Netlify dashboard
-const MODEL = 'Gemini 3.1 Pro Preview';  // Free tier model (Gemini 3 Pro Preview)
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const MODEL = 'gemini-3.1-pro-preview';  // Requires billing enabled
 
 exports.handler = async (event) => {
-  // Only allow POST
   if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: 'Method Not Allowed' }),
-    };
+    return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
 
   try {
     const { prompt } = JSON.parse(event.body);
+    if (!prompt) return { statusCode: 400, body: JSON.stringify({ error: 'Prompt required' }) };
 
-    if (!prompt) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'Prompt is required' }),
-      };
-    }
-
-    // Prepare request to Gemini API
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-
-    const requestBody = {
-      contents: [
-        {
-          parts: [{ text: prompt }]
-        }
-      ]
-    };
-
+    
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({ 
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { thinkingLevel: "low" } // Low = faster, cheaper
+      }),
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Gemini API error:', data);
-      return {
-        statusCode: response.status,
-        body: JSON.stringify({ error: data.error?.message || 'Gemini API error' }),
-      };
+      // Specific billing error message
+      if (response.status === 429 || data.error?.message?.includes('quota')) {
+        return { statusCode: 429, body: JSON.stringify({ 
+          error: 'Billing required. Gemini 3.1 Pro needs a payment method on file.' 
+        })};
+      }
+      return { statusCode: response.status, body: JSON.stringify({ error: data.error?.message }) };
     }
 
-    // Extract the response text
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response from Gemini.';
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response.';
+    return { statusCode: 200, body: JSON.stringify({ response: reply }) };
 
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ response: reply }),
-    };
   } catch (error) {
-    console.error('Function error:', error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error' }),
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: 'Server error' }) };
   }
 };
