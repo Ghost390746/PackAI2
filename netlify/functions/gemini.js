@@ -1,6 +1,6 @@
 // netlify/functions/gemini.js
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;  // Set in Netlify dashboard
-const MODEL = 'gemini-1.5-pro';  // Free tier model (or use 'gemini-1.5-pro-latest')
+const MODEL = 'gemini-3.0-pro-preview';  // Free tier model (Gemini 3 Pro Preview)
 
 exports.handler = async (event) => {
   // Only allow POST
